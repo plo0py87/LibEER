@@ -1,5 +1,7 @@
 from models.CoralDgcnn import CoralDgcnn
 from models.DGCNN import DGCNN
+from models.DGCNN_LSTM import DGCNN_LSTM
+from models.DGCNN_NodeLSTM import DGCNN_NodeLSTM
 from models.DannDgcnn import DannDgcnn
 # from models.RGNN import RGNN
 from models.RGNN_official import SymSimGCNNet
@@ -22,6 +24,8 @@ from models.NSAL_DGAT import Domain_adaption_model
 
 Model = {
     'DGCNN': DGCNN,
+    'DGCNN_LSTM': DGCNN_LSTM,
+    'DGCNN_NodeLSTM': DGCNN_NodeLSTM,
     'CoralDgcnn': CoralDgcnn,
     'DannDgcnn': DannDgcnn,
     'R2GSTNN': R2GSTNN,
