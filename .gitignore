@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv39/
+LibEER/logs/
+LibEER/result/
+result/
+*.log
+bidann_log*.txt

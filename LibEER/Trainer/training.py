@@ -15,14 +15,20 @@ def train(model, dataset_train, dataset_val, dataset_test, device, output_dir="r
     sampler_val = SequentialSampler(dataset_val)
     sampler_test = SequentialSampler(dataset_test)
     # load dataset
+    # On Windows, multiprocessing uses spawn, which re-imports this whole
+    # process (torch, mne, braindecode, ...) for every worker on every
+    # DataLoader construction -- for small in-memory tensors that overhead
+    # dwarfs the actual data loading, so keep it single-process there.
+    import platform
+    _num_workers = 0 if platform.system() == "Windows" else 4
     data_loader_train = DataLoader(
-        dataset_train, sampler=sampler_train, batch_size=batch_size, num_workers=4
+        dataset_train, sampler=sampler_train, batch_size=batch_size, num_workers=_num_workers
     )
     data_loader_val = DataLoader(
-        dataset_val, sampler=sampler_val, batch_size=batch_size, num_workers=4
+        dataset_val, sampler=sampler_val, batch_size=batch_size, num_workers=_num_workers
     )
     data_loader_test = DataLoader(
-        dataset_test, sampler=sampler_test, batch_size=batch_size, num_workers=4
+        dataset_test, sampler=sampler_test, batch_size=batch_size, num_workers=_num_workers
     )
     model = model.to(device)
     best_metric = {s: 0. for s in metrics}
