@@ -127,18 +127,8 @@ def main():
         model = pretrain_backbone(model, pretrain_x, pretrain_y, device,
                                    epochs=args.pretrain_epochs, lr=args.lr, batch_size=args.batch_size)
 
-        # 3. freeze backbone, unfreeze Adapter modules only
-        for p in model.parameters():
-            p.requires_grad = False
-        adapter_params = 0
-        for name, module in model.named_modules():
-            if isinstance(module, Adapter):
-                for p in module.parameters():
-                    p.requires_grad = True
-                    adapter_params += p.numel()
-        print(f"-> Unfrozen adapter parameters: {adapter_params} (paper Table 8 target: 1456)", flush=True)
-
-        # 4. leakage-free trial split for target subject: 8 finetune / 7 test trials
+        # 3. leakage-free trial split for target subject: 8 finetune / 7 test trials
+        #    (computed BEFORE freezing so we can also score the zero-shot / no-finetune model)
         trial_indices = np.arange(15)
         rng = np.random.RandomState(args.seed + subj_num)
         rng.shuffle(trial_indices)
@@ -153,7 +143,28 @@ def main():
         # leaking test_x into the scaler fit -- see AFTL_train.py docstring)
         ft_x, _, test_x = normalize(ft_x, ft_x, test_x, dim='sample', method='z-score')
 
-        # 5. fine-tune adapters via LibEER's own Trainer.training.train()
+        # 4. ZERO-SHOT: score the freshly-pretrained backbone on the target's test trials,
+        #    with NO fine-tuning at all -- pure cross-subject transfer, no adaptation.
+        model.eval()
+        with torch.no_grad():
+            zs_logits = model(torch.Tensor(test_x).to(device))
+            zs_pred = zs_logits.argmax(dim=1).cpu().numpy()
+        zs_true = test_y.argmax(axis=1) if test_y.ndim > 1 else test_y
+        zero_shot_acc = float((zs_pred == zs_true).mean())
+        print(f"-> Subject {subj_num} ZERO-SHOT (no finetune) test acc: {zero_shot_acc*100:.2f}%", flush=True)
+
+        # 5. freeze backbone, unfreeze Adapter modules only
+        for p in model.parameters():
+            p.requires_grad = False
+        adapter_params = 0
+        for name, module in model.named_modules():
+            if isinstance(module, Adapter):
+                for p in module.parameters():
+                    p.requires_grad = True
+                    adapter_params += p.numel()
+        print(f"-> Unfrozen adapter parameters: {adapter_params} (paper Table 8 target: 1456)", flush=True)
+
+        # 6. fine-tune adapters via LibEER's own Trainer.training.train()
         dataset_ft = torch.utils.data.TensorDataset(torch.Tensor(ft_x), torch.Tensor(ft_y))
         dataset_test = torch.utils.data.TensorDataset(torch.Tensor(test_x), torch.Tensor(test_y))
         optimizer_ft = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
@@ -169,22 +180,24 @@ def main():
             optimizer=optimizer_ft, batch_size=args.batch_size, epochs=args.finetune_epochs, criterion=criterion,
         )
         print(f"-> Subject {subj_num} AFTL test metrics: {round_metric}", flush=True)
-        results[subj_num] = round_metric['acc']
+        results[subj_num] = {"zero_shot_acc": zero_shot_acc, "finetuned_acc": round_metric['acc']}
 
         with open(os.path.join(os.path.dirname(__file__), "AFTL_libeer_result.json"), "w") as f:
             json.dump(results, f, indent=2)
 
-    print("\n" + "=" * 50)
+    print("\n" + "=" * 70)
     print("FINAL SUMMARY (AFTL, LibEER pipeline, leakage-free trial split)")
-    print("=" * 50)
-    for s, acc in results.items():
-        print(f"Subject {s:>2}: {acc*100:.2f}%")
+    print("=" * 70)
+    for s, r in results.items():
+        print(f"Subject {s:>2}: zero-shot={r['zero_shot_acc']*100:6.2f}%   finetuned={r['finetuned_acc']*100:6.2f}%   "
+              f"delta={(r['finetuned_acc']-r['zero_shot_acc'])*100:+6.2f}pp")
     if results:
-        vals = list(results.values())
-        print("-" * 50)
-        print(f"Average Accuracy  : {np.mean(vals)*100:.2f}%")
-        print(f"Standard Deviation: {np.std(vals)*100:.2f}%")
-    print("=" * 50)
+        zs_vals = [r['zero_shot_acc'] for r in results.values()]
+        ft_vals = [r['finetuned_acc'] for r in results.values()]
+        print("-" * 70)
+        print(f"Zero-shot  avg: {np.mean(zs_vals)*100:.2f}%  std: {np.std(zs_vals)*100:.2f}%")
+        print(f"Finetuned  avg: {np.mean(ft_vals)*100:.2f}%  std: {np.std(ft_vals)*100:.2f}%")
+    print("=" * 70)
 
 
 if __name__ == "__main__":
