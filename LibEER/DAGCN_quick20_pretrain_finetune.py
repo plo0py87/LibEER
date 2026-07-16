@@ -34,13 +34,12 @@ import torch.optim as optim
 from scipy.io import loadmat
 
 sys.path.insert(0, os.path.dirname(__file__))
-sys.path.insert(0, r"C:\Dev\BCI\DBGC-ATFFNet-AFTL")
 
 from sklearn.preprocessing import StandardScaler
 from utils.utils import setup_seed
 from Trainer.training import train as libeer_train
 
-from model import DAGCN as _DAGCNCore  # DBGC-ATFFNet-AFTL/model.py
+from DAGCN_model import DAGCN as _DAGCNCore
 
 from DGCNN_quick20_realtime_train import QUICK20_CHANNEL_NAME, QUICK20_CHANNEL_INDICES
 from DAGCN_quick20_realtime_train import causal_psd_features

@@ -29,7 +29,6 @@ import torch.nn as nn
 import torch.optim as optim
 
 sys.path.insert(0, os.path.dirname(__file__))
-sys.path.insert(0, r"C:\Dev\BCI\DBGC-ATFFNet-AFTL")
 
 from models.Models import Model  # noqa: F401  (unused, kept for parity w/ other *_train.py scripts)
 from config.setting import preset_setting, set_setting_by_args
@@ -40,7 +39,7 @@ from utils.args import get_args_parser
 from utils.utils import setup_seed
 from Trainer.training import train as libeer_train
 
-from model import DAGCN as _DAGCNCore  # DBGC-ATFFNet-AFTL/model.py
+from DAGCN_model import DAGCN as _DAGCNCore
 
 
 class DAGCNWrapper(nn.Module):

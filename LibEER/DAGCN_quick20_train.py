@@ -2,8 +2,8 @@
 Same as DAGCN_train.py, but slices SEED's 62-channel montage down to the
 19 channels the CGX Quick-20 headset can record, matching the approach in
 DGCNN_quick20_train.py. DAGCN's channel count is baked into a per-dataset
-options dict in DBGC-ATFFNet-AFTL/model.py (chan_num isn't a constructor
-arg), so a 'seed_quick20': [19,3,5] entry was added there for this.
+options dict in DAGCN_model.py (chan_num isn't a constructor arg), so a
+'seed_quick20': [19,3,5] entry was added there for this.
 
 Usage (from C:/Dev/BCI/LibEER/LibEER, using the LibEER venv):
     python DAGCN_quick20_train.py -run_all -epochs 200 -batch_size 128 -lr 0.001 -sessions 1 -seed 42
@@ -20,7 +20,6 @@ import torch.nn as nn
 import torch.optim as optim
 
 sys.path.insert(0, os.path.dirname(__file__))
-sys.path.insert(0, r"C:\Dev\BCI\DBGC-ATFFNet-AFTL")
 
 from models.Models import Model  # noqa: F401  (unused, kept for parity w/ other *_train.py scripts)
 from config.setting import preset_setting, set_setting_by_args
@@ -31,7 +30,7 @@ from utils.args import get_args_parser
 from utils.utils import setup_seed
 from Trainer.training import train as libeer_train
 
-from model import DAGCN as _DAGCNCore  # DBGC-ATFFNet-AFTL/model.py
+from DAGCN_model import DAGCN as _DAGCNCore
 
 SEED_CHANNEL_NAME = [
     'FP1', 'FPZ', 'FP2', 'AF3', 'AF4', 'F7', 'F5', 'F3', 'F1', 'FZ', 'F2', 'F4', 'F6', 'F8', 'FT7', 'FC5', 'FC3', 'FC1',

@@ -32,7 +32,6 @@ from scipy.io import loadmat
 from scipy.signal import welch
 
 sys.path.insert(0, os.path.dirname(__file__))
-sys.path.insert(0, r"C:\Dev\BCI\DBGC-ATFFNet-AFTL")
 
 from config.setting import preset_setting, set_setting_by_args
 from data_utils.preprocess import normalize, label_process
@@ -42,7 +41,7 @@ from utils.store import make_output_dir
 from utils.utils import setup_seed
 from Trainer.training import train as libeer_train
 
-from model import DAGCN as _DAGCNCore  # DBGC-ATFFNet-AFTL/model.py
+from DAGCN_model import DAGCN as _DAGCNCore
 
 from DGCNN_quick20_realtime_train import (
     QUICK20_CHANNEL_NAME, QUICK20_CHANNEL_INDICES, BANDS,
