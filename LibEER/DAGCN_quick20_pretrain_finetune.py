@@ -125,12 +125,7 @@ def train_model(model, train_data, train_label, val_data, val_label, test_data, 
                          optimizer=optimizer, batch_size=batch_size, epochs=epochs, criterion=criterion)
 
 
-def main(args):
-    setup_seed(args.seed)
-    data, trial_labels = build_session1_dataset(args.dataset_path, 200, args.kalman_q, args.kalman_r)
-    # data[subject] -> 15 trials; trial_labels -> (15,) shared across all subjects (same trial order)
-
-    held_out = args.held_out
+def run_fold(data, trial_labels, held_out, args, device):
     other_subjects = [s for s in range(15) if s != held_out]
     print(f"held-out subject: {held_out + 1} (0-indexed {held_out}); "
           f"pretraining on subjects {[s+1 for s in other_subjects]}")
@@ -176,8 +171,6 @@ def main(args):
     ho_ft_train_X = apply_scaler(ho_ft_train_X)
     ho_test_X = apply_scaler(ho_test_X)
 
-    device = torch.device(args.device)
-
     print(f"\n=== Stage 1: pretrain on 14 subjects "
           f"({len(pretrain_train_X)} train samples, {len(pretrain_val_X)} val samples) ===")
     model = DAGCNQuick20Wrapper()
@@ -209,13 +202,51 @@ def main(args):
     print(f"  after fine-tune : {after_acc:.4f}")
     print(f"  delta           : {after_acc - before_acc:+.4f}")
     print("=" * 50)
+    return before_acc, after_acc
+
+
+def main(args):
+    setup_seed(args.seed)
+    data, trial_labels = build_session1_dataset(args.dataset_path, 200, args.kalman_q, args.kalman_r)
+    # data[subject] -> 15 trials; trial_labels -> (15,) shared across all subjects (same trial order)
+    device = torch.device(args.device)
+
+    held_outs = range(15) if args.run_all else [args.held_out]
+    results = {}
+    for held_out in held_outs:
+        setup_seed(args.seed)
+        before_acc, after_acc = run_fold(data, trial_labels, held_out, args, device)
+        results[held_out + 1] = {'before': before_acc, 'after': after_acc}
+
+    if len(results) > 1:
+        befores = np.array([r['before'] for r in results.values()])
+        afters = np.array([r['after'] for r in results.values()])
+        deltas = afters - befores
+        print("\n" + "#" * 50)
+        print("15-FOLD LEAVE-ONE-OUT SUMMARY (session 1)")
+        print("#" * 50)
+        for subj, r in results.items():
+            print(f"  subject {subj:2d}: before {r['before']:.4f}  after {r['after']:.4f}  "
+                  f"delta {r['after']-r['before']:+.4f}")
+        print("-" * 50)
+        print(f"before fine-tune: mean {befores.mean():.4f}  std {befores.std():.4f}")
+        print(f"after  fine-tune: mean {afters.mean():.4f}  std {afters.std():.4f}")
+        print(f"delta           : mean {deltas.mean():+.4f}  std {deltas.std():.4f}")
+        print("#" * 50)
+        with open("DAGCN_quick20_pretrain_finetune_15fold_result.json", "w") as f:
+            import json
+            json.dump(results, f, indent=2)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-held_out', default=0, type=int, help="0-indexed subject to hold out (0 = subject 1)")
+    parser.add_argument('-held_out', default=0, type=int, help="0-indexed subject to hold out (0 = subject 1), ignored if -run_all")
+    parser.add_argument('-run_all', action='store_true', help="run all 15 leave-one-out folds and report mean/std")
     parser.add_argument('-dataset_path', required=True)
-    parser.add_argument('-pretrain_epochs', default=200, type=int)
+    # pretrain converges (best val) within the first few epochs then only overfits
+    # further (val acc peaked at epoch 1 in testing, 0.597 -> 0.51-0.55 by epoch 200) --
+    # default cut way down from 200 to avoid wasting ~99% of pretrain compute on pure overfitting.
+    parser.add_argument('-pretrain_epochs', default=15, type=int)
     parser.add_argument('-pretrain_lr', default=0.001, type=float)
     parser.add_argument('-finetune_epochs', default=40, type=int)
     parser.add_argument('-finetune_lr', default=0.0001, type=float)
